@@ -88,7 +88,7 @@ def run_scan(
     directory: Path,
     json_path: str | None,
     csv_path: str | None,
-    database_path: Path = DEFAULT_DB_PATH,
+    database_path: Path = CONFIG.database_path,
 ) -> int:
     records, errors = scan_directory(directory)
     summary = build_summary(records)
