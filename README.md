@@ -55,6 +55,8 @@ The project is designed around one rule: **your files should never be changed wi
 
 - [Demo Guide](DEMO.md): sample workspace setup, repeatable CLI walkthrough, screenshot checklist, and presentation narration.
 - [Architecture Guide](ARCHITECTURE.md): module responsibilities, data flow, database design, organization workflow, safety boundaries, and design decisions.
+- [v1.0.0 Release Notes](RELEASE_NOTES_v1.0.0.md): initial stable release highlights, safety principles, and recorded verification.
+- [Version](VERSION): current project version.
 
 ## Requirements
 
@@ -369,6 +371,10 @@ FileSense/
 ├── reports/
 ├── .gitignore
 ├── LICENSE
+├── ARCHITECTURE.md
+├── DEMO.md
+├── RELEASE_NOTES_v1.0.0.md
+├── VERSION
 ├── main.py
 ├── README.md
 └── requirements-dev.txt
