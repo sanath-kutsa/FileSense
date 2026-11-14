@@ -7,7 +7,7 @@ def configure_logging(log_path: str | Path, level: str = "INFO") -> logging.Logg
     """Configure a named logger with console and rotating-free file output."""
     numeric_level = getattr(logging, level.upper(), None)
     if not isinstance(numeric_level, int):
-        raise ValueError(f"Unsupported logging level: {level}")
+        raise ValueError(f"Unsupported logging level: {level}")  # noqa: TRY004
 
     logger = logging.getLogger("filesense")
     logger.setLevel(numeric_level)
