@@ -1,5 +1,3 @@
-import sqlite3
-
 from filesense.database import list_scans, save_scan
 from filesense.models import FileRecord
 
@@ -30,7 +28,12 @@ def test_save_scan_persists_scan_and_file_records(tmp_path):
 
 def test_save_scan_records_errors_and_multiple_files(tmp_path):
     database = tmp_path / "filesense.db"
-    save_scan(tmp_path, [make_record(), make_record("second.txt", 20)], ["permission denied"], database)
+    save_scan(
+        tmp_path,
+        [make_record(), make_record("second.txt", 20)],
+        ["permission denied"],
+        database,
+    )
 
     history = list_scans(database_path=database)
 

@@ -1,8 +1,8 @@
 """Search and filtering helpers for scanned file records."""
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import Iterable
+from datetime import UTC, datetime
 
 from .models import FileRecord
 
@@ -28,19 +28,21 @@ def _parse_datetime(value: str | None, field_name: str) -> datetime | None:
     try:
         parsed = datetime.fromisoformat(value)
     except ValueError as error:
-        raise ValueError(f"{field_name} must be a valid ISO date or datetime.") from error
+        raise ValueError(
+            f"{field_name} must be a valid ISO date or datetime."
+        ) from error
     if field_name == "modified_before" and len(value) == 10:
         parsed = parsed.replace(hour=23, minute=59, second=59, microsecond=999999)
     if parsed.tzinfo is None:
         parsed = parsed.astimezone()
-    return parsed.astimezone(timezone.utc)
+    return parsed.astimezone(UTC)
 
 
 def _record_datetime(value: str) -> datetime:
     parsed = datetime.fromisoformat(value)
     if parsed.tzinfo is None:
         parsed = parsed.astimezone()
-    return parsed.astimezone(timezone.utc)
+    return parsed.astimezone(UTC)
 
 
 def _normalize_extension(extension: str) -> str:
@@ -79,7 +81,10 @@ def search_files(
     sort_keys = {
         "name": lambda item: (item.name.casefold(), item.path.casefold()),
         "size": lambda item: (item.size_bytes, item.name.casefold()),
-        "modified": lambda item: (_record_datetime(item.modified_at), item.name.casefold()),
+        "modified": lambda item: (
+            _record_datetime(item.modified_at),
+            item.name.casefold(),
+        ),
     }
     if criteria.sort_by not in sort_keys:
         raise ValueError("sort_by must be one of: name, size, modified.")

@@ -28,8 +28,7 @@ def iter_files(root: Path, errors: list[str] | None = None) -> Iterator[Path]:
     ):
         current_path = Path(current)
         directories[:] = [
-            name for name in directories
-            if not (current_path / name).is_symlink()
+            name for name in directories if not (current_path / name).is_symlink()
         ]
         for filename in filenames:
             path = current_path / filename

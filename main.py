@@ -10,7 +10,11 @@ from filesense.database import list_scans, save_scan
 from filesense.duplicates import find_duplicates
 from filesense.logging_config import configure_logging
 from filesense.models import FileRecord
-from filesense.organizer import apply_organization_plan, build_organization_plan, rollback_organization
+from filesense.organizer import (
+    apply_organization_plan,
+    build_organization_plan,
+    rollback_organization,
+)
 from filesense.reports import export_csv, export_json
 from filesense.scanner import scan_directory
 from filesense.search import SearchCriteria, search_files
@@ -23,21 +27,38 @@ def create_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    scan_parser = subparsers.add_parser("scan", help="Scan a directory and summarize its files.")
+    scan_parser = subparsers.add_parser(
+        "scan", help="Scan a directory and summarize its files."
+    )
     scan_parser.add_argument("directory", type=Path, help="Directory to scan.")
-    scan_parser.add_argument("--json", dest="json_path", help="Write a JSON report to this path.")
-    scan_parser.add_argument("--csv", dest="csv_path", help="Write a CSV report to this path.")
-    scan_parser.add_argument("--database", type=Path, default=CONFIG.database_path, help="SQLite history database path.")
+    scan_parser.add_argument(
+        "--json", dest="json_path", help="Write a JSON report to this path."
+    )
+    scan_parser.add_argument(
+        "--csv", dest="csv_path", help="Write a CSV report to this path."
+    )
+    scan_parser.add_argument(
+        "--database",
+        type=Path,
+        default=CONFIG.database_path,
+        help="SQLite history database path.",
+    )
 
-    largest_parser = subparsers.add_parser("largest", help="List the largest files in a directory.")
+    largest_parser = subparsers.add_parser(
+        "largest", help="List the largest files in a directory."
+    )
     largest_parser.add_argument("directory", type=Path, help="Directory to scan.")
-    largest_parser.add_argument("--limit", type=int, default=10, help="Number of files to show.")
+    largest_parser.add_argument(
+        "--limit", type=int, default=10, help="Number of files to show."
+    )
 
     duplicate_parser = subparsers.add_parser(
         "duplicates",
         help="Find files with identical contents using SHA-256.",
     )
-    duplicate_parser.add_argument("directory", type=Path, help="Directory to scan for duplicates.")
+    duplicate_parser.add_argument(
+        "directory", type=Path, help="Directory to scan for duplicates."
+    )
     duplicate_parser.add_argument(
         "--chunk-size",
         type=int,
@@ -45,32 +66,95 @@ def create_parser() -> argparse.ArgumentParser:
         help="Bytes read per hashing operation (default: 1048576).",
     )
 
-    search_parser = subparsers.add_parser("search", help="Search and filter files in a directory.")
+    search_parser = subparsers.add_parser(
+        "search", help="Search and filter files in a directory."
+    )
     search_parser.add_argument("directory", type=Path, help="Directory to search.")
-    search_parser.add_argument("--name", help="Case-insensitive partial filename match.")
-    search_parser.add_argument("--extension", action="append", dest="extensions", help="Extension filter; repeat to allow multiple extensions.")
-    search_parser.add_argument("--category", help="File category, such as Documents or Images.")
-    search_parser.add_argument("--min-size", type=int, help="Minimum file size in bytes.")
-    search_parser.add_argument("--max-size", type=int, help="Maximum file size in bytes.")
-    search_parser.add_argument("--modified-after", help="Include files modified on or after this ISO date/time.")
-    search_parser.add_argument("--modified-before", help="Include files modified on or before this ISO date/time.")
-    search_parser.add_argument("--sort-by", choices=("name", "size", "modified"), default="name")
-    search_parser.add_argument("--descending", action="store_true", help="Reverse the selected sort order.")
-    search_parser.add_argument("--database", type=Path, default=CONFIG.database_path, help="SQLite history database path.")
+    search_parser.add_argument(
+        "--name", help="Case-insensitive partial filename match."
+    )
+    search_parser.add_argument(
+        "--extension",
+        action="append",
+        dest="extensions",
+        help="Extension filter; repeat to allow multiple extensions.",
+    )
+    search_parser.add_argument(
+        "--category", help="File category, such as Documents or Images."
+    )
+    search_parser.add_argument(
+        "--min-size", type=int, help="Minimum file size in bytes."
+    )
+    search_parser.add_argument(
+        "--max-size", type=int, help="Maximum file size in bytes."
+    )
+    search_parser.add_argument(
+        "--modified-after",
+        help="Include files modified on or after this ISO date/time.",
+    )
+    search_parser.add_argument(
+        "--modified-before",
+        help="Include files modified on or before this ISO date/time.",
+    )
+    search_parser.add_argument(
+        "--sort-by", choices=("name", "size", "modified"), default="name"
+    )
+    search_parser.add_argument(
+        "--descending", action="store_true", help="Reverse the selected sort order."
+    )
+    search_parser.add_argument(
+        "--database",
+        type=Path,
+        default=CONFIG.database_path,
+        help="SQLite history database path.",
+    )
 
-    history_parser = subparsers.add_parser("history", help="Show recent saved scan history.")
-    history_parser.add_argument("--limit", type=int, default=10, help="Number of previous scans to display.")
-    history_parser.add_argument("--database", type=Path, default=CONFIG.database_path, help="SQLite history database path.")
+    history_parser = subparsers.add_parser(
+        "history", help="Show recent saved scan history."
+    )
+    history_parser.add_argument(
+        "--limit", type=int, default=10, help="Number of previous scans to display."
+    )
+    history_parser.add_argument(
+        "--database",
+        type=Path,
+        default=CONFIG.database_path,
+        help="SQLite history database path.",
+    )
 
-    organize_parser = subparsers.add_parser("organize", help="Preview or explicitly apply safe file organization.")
-    organize_parser.add_argument("directory", type=Path, help="Directory whose files should be organized.")
-    organize_parser.add_argument("--destination", type=Path, help="Organization destination (default: <directory>/Organized).")
-    organize_parser.add_argument("--rules", type=Path, help="Optional JSON file mapping extensions to folder names.")
-    organize_parser.add_argument("--apply", action="store_true", help="Ask for confirmation and apply the previewed moves.")
+    organize_parser = subparsers.add_parser(
+        "organize", help="Preview or explicitly apply safe file organization."
+    )
+    organize_parser.add_argument(
+        "directory", type=Path, help="Directory whose files should be organized."
+    )
+    organize_parser.add_argument(
+        "--destination",
+        type=Path,
+        help="Organization destination (default: <directory>/Organized).",
+    )
+    organize_parser.add_argument(
+        "--rules",
+        type=Path,
+        help="Optional JSON file mapping extensions to folder names.",
+    )
+    organize_parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Ask for confirmation and apply the previewed moves.",
+    )
 
-    rollback_parser = subparsers.add_parser("rollback", help="Reverse a previously recorded organization operation.")
-    rollback_parser.add_argument("destination", type=Path, help="Organization destination containing the operation journal.")
-    rollback_parser.add_argument("--operation-id", default="latest", help="Operation ID to reverse, or 'latest'.")
+    rollback_parser = subparsers.add_parser(
+        "rollback", help="Reverse a previously recorded organization operation."
+    )
+    rollback_parser.add_argument(
+        "destination",
+        type=Path,
+        help="Organization destination containing the operation journal.",
+    )
+    rollback_parser.add_argument(
+        "--operation-id", default="latest", help="Operation ID to reverse, or 'latest'."
+    )
 
     return parser
 
@@ -187,7 +271,9 @@ def run_search(args: argparse.Namespace) -> int:
     print(f"Matching files: {len(matches)}")
     print(f"Scan saved as history entry #{scan_id}")
     for record in matches:
-        print(f"{format_bytes(record.size_bytes):>12}  {record.name}  [{record.category}]")
+        print(
+            f"{format_bytes(record.size_bytes):>12}  {record.name}  [{record.category}]"
+        )
         print(f"              {record.path}")
     if not matches:
         print("No files matched the supplied filters.")
@@ -215,7 +301,9 @@ def run_history(limit: int, database_path: Path) -> int:
     return 0
 
 
-def run_organize(directory: Path, destination: Path | None, rules_path: Path | None, apply: bool) -> int:
+def run_organize(
+    directory: Path, destination: Path | None, rules_path: Path | None, apply: bool
+) -> int:
     """Preview proposed moves and apply them only after explicit confirmation."""
     target = destination or (directory / "Organized")
     rules = {}
@@ -225,9 +313,12 @@ def run_organize(directory: Path, destination: Path | None, rules_path: Path | N
         except (OSError, json.JSONDecodeError) as error:
             raise ValueError(f"Could not load organization rules: {error}") from error
         if not isinstance(rules, dict) or not all(
-            isinstance(key, str) and isinstance(value, str) for key, value in rules.items()
+            isinstance(key, str) and isinstance(value, str)
+            for key, value in rules.items()
         ):
-            raise ValueError("Rules JSON must be an object mapping extensions to folder names.")
+            raise ValueError(
+                "Rules JSON must be an object mapping extensions to folder names."
+            )
 
     records, errors = scan_directory(directory)
     plan = build_organization_plan(records, target, rules)
@@ -273,7 +364,9 @@ def main() -> int:
 
     try:
         if args.command == "scan":
-            return run_scan(args.directory, args.json_path, args.csv_path, args.database)
+            return run_scan(
+                args.directory, args.json_path, args.csv_path, args.database
+            )
         if args.command == "largest":
             return run_largest(args.directory, args.limit)
         if args.command == "duplicates":
@@ -285,7 +378,9 @@ def main() -> int:
         if args.command == "history":
             return run_history(args.limit, args.database)
         if args.command == "organize":
-            return run_organize(args.directory, args.destination, args.rules, args.apply)
+            return run_organize(
+                args.directory, args.destination, args.rules, args.apply
+            )
         if args.command == "rollback":
             return run_rollback(args.destination, args.operation_id)
     except (OSError, ValueError) as error:

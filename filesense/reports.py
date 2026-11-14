@@ -2,15 +2,17 @@
 
 import csv
 import json
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 from .analyzer import build_summary
 from .models import FileRecord
 
 
 def export_json(
-    records: Iterable[FileRecord], destination: str | Path, errors: list[str] | None = None
+    records: Iterable[FileRecord],
+    destination: str | Path,
+    errors: list[str] | None = None,
 ) -> Path:
     """Write a JSON report and return its path."""
     record_list = list(records)

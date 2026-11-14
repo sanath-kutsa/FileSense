@@ -41,7 +41,9 @@ def test_plan_uses_category_and_does_not_move_files(tmp_path):
 def test_custom_extension_rule_overrides_category(tmp_path):
     sample = tmp_path / "report.pdf"
     sample.write_text("pdf", encoding="utf-8")
-    plan = build_organization_plan([record(sample)], tmp_path / "out", {".pdf": "PDF Files"})
+    plan = build_organization_plan(
+        [record(sample)], tmp_path / "out", {".pdf": "PDF Files"}
+    )
     assert plan[0].destination.parent.name == "PDF Files"
 
 
@@ -59,7 +61,9 @@ def test_plan_rejects_unsafe_rule_folder(tmp_path):
     sample = tmp_path / "report.txt"
     sample.write_text("data", encoding="utf-8")
     with pytest.raises(ValueError):
-        build_organization_plan([record(sample)], tmp_path / "out", {".txt": "../outside"})
+        build_organization_plan(
+            [record(sample)], tmp_path / "out", {".txt": "../outside"}
+        )
 
 
 def test_apply_requires_explicit_confirmation(tmp_path):
@@ -119,7 +123,7 @@ def test_apply_rejects_malformed_history_before_moving_files(tmp_path):
 
 
 def test_apply_reverts_moves_if_history_write_fails(tmp_path, monkeypatch):
-    import filesense.organizer as organizer
+    from filesense import organizer
 
     sample = tmp_path / "notes.txt"
     sample.write_text("hello", encoding="utf-8")
@@ -138,7 +142,7 @@ def test_apply_reverts_moves_if_history_write_fails(tmp_path, monkeypatch):
 
 
 def test_rollback_reverts_restore_if_history_write_fails(tmp_path, monkeypatch):
-    import filesense.organizer as organizer
+    from filesense import organizer
 
     sample = tmp_path / "notes.txt"
     sample.write_text("hello", encoding="utf-8")

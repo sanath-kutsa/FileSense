@@ -3,6 +3,7 @@
 import logging
 from pathlib import Path
 
+
 def configure_logging(log_path: str | Path, level: str = "INFO") -> logging.Logger:
     """Configure a named logger with console and rotating-free file output."""
     numeric_level = getattr(logging, level.upper(), None)

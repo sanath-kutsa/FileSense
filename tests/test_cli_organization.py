@@ -10,9 +10,7 @@ def test_history_parser_uses_centralized_database_default():
     assert args.database == cli.CONFIG.database_path
 
 
-def test_organize_preview_apply_and_rollback_cli_workflow(
-    tmp_path, monkeypatch
-):
+def test_organize_preview_apply_and_rollback_cli_workflow(tmp_path, monkeypatch):
     source = tmp_path / "source"
     source.mkdir()
     samples = {
@@ -52,8 +50,12 @@ def test_organize_preview_apply_and_rollback_cli_workflow(
     monkeypatch.setattr("builtins.input", lambda _prompt: "yes")
     assert cli.main() == 0
     assert not any((source / name).exists() for name in samples)
-    assert (destination / "Documents" / "notes.txt").read_text(encoding="utf-8") == "notes"
-    assert (destination / "Documents" / "report.pdf").read_text(encoding="utf-8") == "report"
+    assert (destination / "Documents" / "notes.txt").read_text(
+        encoding="utf-8"
+    ) == "notes"
+    assert (destination / "Documents" / "report.pdf").read_text(
+        encoding="utf-8"
+    ) == "report"
     assert (destination / "Images" / "photo.jpg").read_text(encoding="utf-8") == "photo"
     assert (destination / ".filesense-history.json").is_file()
 

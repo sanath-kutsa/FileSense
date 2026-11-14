@@ -2,9 +2,9 @@
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable
 
 from .analyzer import build_summary
 from .models import FileRecord
@@ -60,7 +60,7 @@ def save_scan(
     record_list = list(records)
     error_list = list(errors)
     summary = build_summary(record_list)
-    scanned_at = datetime.now(timezone.utc).isoformat()
+    scanned_at = datetime.now(UTC).isoformat()
     connection = connect_database(database_path)
     try:
         with connection:

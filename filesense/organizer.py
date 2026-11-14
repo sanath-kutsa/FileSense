@@ -1,12 +1,12 @@
 """Preview-first file organization with an operation journal and rollback."""
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import json
 import logging
-from pathlib import Path
 import shutil
-from typing import Iterable, Mapping
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
 from uuid import uuid4
 
 from .models import FileRecord
@@ -52,7 +52,9 @@ def build_organization_plan(
     """
     destination_root = Path(destination).expanduser().resolve()
     normalized_rules = {
-        (key.lower() if key.startswith(".") else f".{key.lower()}"): _safe_folder_name(value)
+        (key.lower() if key.startswith(".") else f".{key.lower()}"): _safe_folder_name(
+            value
+        )
         for key, value in (rules or {}).items()
     }
     plan: list[MoveOperation] = []
@@ -71,14 +73,18 @@ def build_organization_plan(
             # Never attempt to organize files already inside the target tree.
             continue
 
-        folder = normalized_rules.get(record.extension.lower(), _safe_folder_name(record.category))
+        folder = normalized_rules.get(
+            record.extension.lower(), _safe_folder_name(record.category)
+        )
         target = (destination_root / folder / source.name).resolve()
         if target == source:
             continue
         try:
             target.relative_to(destination_root)
         except ValueError as error:
-            raise ValueError("Planned destination escaped the organization directory.") from error
+            raise ValueError(
+                "Planned destination escaped the organization directory."
+            ) from error
         if target.exists() or target in destinations:
             raise FileExistsError(
                 f"Destination already exists or is duplicated: {target}. "
@@ -136,13 +142,17 @@ def apply_organization_plan(
         try:
             target.relative_to(destination_root)
         except ValueError as error:
-            raise ValueError("A planned destination is outside the organization directory.") from error
+            raise ValueError(
+                "A planned destination is outside the organization directory."
+            ) from error
         try:
             source.relative_to(destination_root)
         except ValueError:
             pass
         else:
-            raise ValueError("A source file cannot already be inside the organization directory.")
+            raise ValueError(
+                "A source file cannot already be inside the organization directory."
+            )
         if source == target:
             raise ValueError("Source and destination paths must be different.")
         if not source.is_file():
@@ -171,7 +181,7 @@ def apply_organization_plan(
 
     entry = {
         "operation_id": operation_id,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
         "rolled_back": False,
         "moves": [
             {"source": str(item.source), "destination": str(item.destination)}
@@ -187,7 +197,9 @@ def apply_organization_plan(
             operation.source.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(operation.destination), str(operation.source))
         raise
-    LOGGER.info("Organization operation %s completed (%d files)", operation_id, len(completed))
+    LOGGER.info(
+        "Organization operation %s completed (%d files)", operation_id, len(completed)
+    )
     return AppliedOperation(operation_id=operation_id, moved_files=tuple(completed))
 
 
@@ -199,8 +211,10 @@ def rollback_organization(
     history_path = _history_path(destination)
     entries = _read_history(history_path)
     candidates = [
-        item for item in entries
-        if not item.get("rolled_back") and (operation_id == "latest" or item.get("operation_id") == operation_id)
+        item
+        for item in entries
+        if not item.get("rolled_back")
+        and (operation_id == "latest" or item.get("operation_id") == operation_id)
     ]
     if not candidates:
         raise ValueError(f"No active organization operation found for: {operation_id}")
@@ -218,14 +232,18 @@ def rollback_organization(
         )
         recorded_operation_id = entry["operation_id"]
     except (KeyError, TypeError, ValueError) as error:
-        raise ValueError("FileSense operation history contains an invalid operation.") from error
+        raise ValueError(
+            "FileSense operation history contains an invalid operation."
+        ) from error
 
     destination_root = Path(destination).expanduser().resolve()
     for operation in operations:
         try:
             operation.destination.resolve().relative_to(destination_root)
         except ValueError as error:
-            raise ValueError("Operation journal contains a destination outside its organization directory.") from error
+            raise ValueError(
+                "Operation journal contains a destination outside its organization directory."
+            ) from error
         if not operation.source.is_absolute():
             raise ValueError("Operation journal contains a non-absolute original path.")
     for operation in operations:
@@ -250,7 +268,7 @@ def rollback_organization(
         raise
 
     entry["rolled_back"] = True
-    entry["rolled_back_at"] = datetime.now(timezone.utc).isoformat()
+    entry["rolled_back_at"] = datetime.now(UTC).isoformat()
     try:
         _write_history(history_path, entries)
     except OSError:

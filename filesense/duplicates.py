@@ -2,9 +2,9 @@
 
 import hashlib
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 from .models import FileRecord
 
@@ -68,7 +68,9 @@ def find_duplicates(
                     DuplicateGroup(
                         sha256=digest,
                         size_bytes=size_bytes,
-                        files=tuple(sorted(matching_records, key=lambda item: item.path)),
+                        files=tuple(
+                            sorted(matching_records, key=lambda item: item.path)
+                        ),
                     )
                 )
 

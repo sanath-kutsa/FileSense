@@ -1,9 +1,7 @@
-from datetime import datetime, timezone
-
 import pytest
 
 from filesense.models import FileRecord
-from filesense.search import SearchCriteria, search_files
+from filesense.search import search_files
 
 
 def make_record(name, extension, size, category, modified):
@@ -20,10 +18,16 @@ def make_record(name, extension, size, category, modified):
 @pytest.fixture
 def records():
     return [
-        make_record("Project Notes.txt", ".txt", 100, "Documents", "2026-01-01T10:00:00+00:00"),
+        make_record(
+            "Project Notes.txt", ".txt", 100, "Documents", "2026-01-01T10:00:00+00:00"
+        ),
         make_record("holiday.png", ".png", 500, "Images", "2026-02-01T10:00:00+00:00"),
-        make_record("project-plan.PDF", ".pdf", 300, "Documents", "2026-03-01T10:00:00+00:00"),
-        make_record("archive", "[no extension]", 50, "Other", "2025-12-01T10:00:00+00:00"),
+        make_record(
+            "project-plan.PDF", ".pdf", 300, "Documents", "2026-03-01T10:00:00+00:00"
+        ),
+        make_record(
+            "archive", "[no extension]", 50, "Other", "2025-12-01T10:00:00+00:00"
+        ),
     ]
 
 
@@ -48,7 +52,11 @@ def test_search_combines_extension_and_name_filters(records):
 
 
 def test_search_by_modified_date_is_inclusive(records):
-    found = search_files(records, modified_after="2026-02-01", modified_before="2026-02-01T10:00:00+00:00")
+    found = search_files(
+        records,
+        modified_after="2026-02-01",
+        modified_before="2026-02-01T10:00:00+00:00",
+    )
     assert [item.name for item in found] == ["holiday.png"]
 
 

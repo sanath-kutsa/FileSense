@@ -47,14 +47,16 @@ def test_export_csv_writes_header_and_file_metadata(tmp_path):
     with result.open(newline="", encoding="utf-8") as csv_file:
         rows = list(csv.DictReader(csv_file))
     assert result == destination
-    assert rows == [{
-        "name": "notes.txt",
-        "path": "/tmp/notes.txt",
-        "extension": ".txt",
-        "size_bytes": "5",
-        "modified_at": "2026-01-01T00:00:00+00:00",
-        "category": "Documents",
-    }]
+    assert rows == [
+        {
+            "name": "notes.txt",
+            "path": "/tmp/notes.txt",
+            "extension": ".txt",
+            "size_bytes": "5",
+            "modified_at": "2026-01-01T00:00:00+00:00",
+            "category": "Documents",
+        }
+    ]
 
 
 def test_export_csv_handles_empty_records(tmp_path):

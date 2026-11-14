@@ -1,7 +1,7 @@
 """Analysis helpers for scanned file records."""
 
 from collections import defaultdict
-from typing import Iterable
+from collections.abc import Iterable
 
 from .models import FileRecord
 
@@ -42,9 +42,7 @@ def build_summary(records: Iterable[FileRecord]) -> dict:
     }
 
 
-def largest_files(
-    records: Iterable[FileRecord], limit: int = 10
-) -> list[FileRecord]:
+def largest_files(records: Iterable[FileRecord], limit: int = 10) -> list[FileRecord]:
     """Return up to limit records ordered by descending file size."""
     if limit < 1:
         raise ValueError("limit must be at least 1")
