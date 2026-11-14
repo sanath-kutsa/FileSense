@@ -4,10 +4,12 @@ import pytest
 
 from filesense.models import FileRecord
 from filesense.organizer import (
+    HISTORY_FILENAME,
     apply_organization_plan,
     build_organization_plan,
     rollback_organization,
 )
+
 
 def record(path: Path, category: str = "Documents") -> FileRecord:
     stat = path.stat()
@@ -19,6 +21,7 @@ def record(path: Path, category: str = "Documents") -> FileRecord:
         modified_at="2026-01-01T00:00:00+00:00",
         category=category,
     )
+
 
 def test_plan_uses_category_and_does_not_move_files(tmp_path):
     source = tmp_path / "source"
@@ -34,11 +37,13 @@ def test_plan_uses_category_and_does_not_move_files(tmp_path):
     assert sample.exists()
     assert not destination.exists()
 
+
 def test_custom_extension_rule_overrides_category(tmp_path):
     sample = tmp_path / "report.pdf"
     sample.write_text("pdf", encoding="utf-8")
     plan = build_organization_plan([record(sample)], tmp_path / "out", {".pdf": "PDF Files"})
     assert plan[0].destination.parent.name == "PDF Files"
+
 
 def test_plan_rejects_existing_destination(tmp_path):
     sample = tmp_path / "report.txt"
@@ -49,11 +54,13 @@ def test_plan_rejects_existing_destination(tmp_path):
     with pytest.raises(FileExistsError):
         build_organization_plan([record(sample)], tmp_path / "out")
 
+
 def test_plan_rejects_unsafe_rule_folder(tmp_path):
     sample = tmp_path / "report.txt"
     sample.write_text("data", encoding="utf-8")
     with pytest.raises(ValueError):
         build_organization_plan([record(sample)], tmp_path / "out", {".txt": "../outside"})
+
 
 def test_apply_requires_explicit_confirmation(tmp_path):
     sample = tmp_path / "notes.txt"
@@ -62,6 +69,7 @@ def test_apply_requires_explicit_confirmation(tmp_path):
     with pytest.raises(PermissionError):
         apply_organization_plan(plan, tmp_path / "out")
     assert sample.exists()
+
 
 def test_apply_and_rollback_restore_original_file(tmp_path):
     sample = tmp_path / "notes.txt"
@@ -80,6 +88,7 @@ def test_apply_and_rollback_restore_original_file(tmp_path):
     assert sample.read_text(encoding="utf-8") == "hello"
     assert not moved.exists()
 
+
 def test_rollback_refuses_to_overwrite_original_path(tmp_path):
     sample = tmp_path / "notes.txt"
     sample.write_text("hello", encoding="utf-8")
@@ -92,3 +101,61 @@ def test_rollback_refuses_to_overwrite_original_path(tmp_path):
     sample.write_text("new content", encoding="utf-8")
     with pytest.raises(FileExistsError):
         rollback_organization(destination, applied.operation_id)
+
+
+def test_apply_rejects_malformed_history_before_moving_files(tmp_path):
+    sample = tmp_path / "notes.txt"
+    sample.write_text("hello", encoding="utf-8")
+    destination = tmp_path / "out"
+    destination.mkdir()
+    (destination / HISTORY_FILENAME).write_text("{}", encoding="utf-8")
+    plan = build_organization_plan([record(sample)], destination)
+
+    with pytest.raises(ValueError, match="invalid format"):
+        apply_organization_plan(plan, destination, confirmed=True)
+
+    assert sample.read_text(encoding="utf-8") == "hello"
+    assert not (destination / "Documents" / sample.name).exists()
+
+
+def test_apply_reverts_moves_if_history_write_fails(tmp_path, monkeypatch):
+    import filesense.organizer as organizer
+
+    sample = tmp_path / "notes.txt"
+    sample.write_text("hello", encoding="utf-8")
+    destination = tmp_path / "out"
+    plan = build_organization_plan([record(sample)], destination)
+
+    def fail_write(path, entries):
+        raise OSError("simulated journal write failure")
+
+    monkeypatch.setattr(organizer, "_write_history", fail_write)
+    with pytest.raises(OSError, match="simulated"):
+        apply_organization_plan(plan, destination, confirmed=True)
+
+    assert sample.read_text(encoding="utf-8") == "hello"
+    assert not (destination / "Documents" / sample.name).exists()
+
+
+def test_rollback_reverts_restore_if_history_write_fails(tmp_path, monkeypatch):
+    import filesense.organizer as organizer
+
+    sample = tmp_path / "notes.txt"
+    sample.write_text("hello", encoding="utf-8")
+    destination = tmp_path / "out"
+    applied = apply_organization_plan(
+        build_organization_plan([record(sample)], destination),
+        destination,
+        confirmed=True,
+    )
+    moved = destination / "Documents" / sample.name
+
+    def fail_write(path, entries):
+        raise OSError("simulated journal write failure")
+
+    monkeypatch.setattr(organizer, "_write_history", fail_write)
+    with pytest.raises(OSError, match="simulated"):
+        rollback_organization(destination, applied.operation_id)
+
+    assert not sample.exists()
+    assert moved.read_text(encoding="utf-8") == "hello"
