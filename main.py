@@ -288,7 +288,7 @@ def main() -> int:
             return run_organize(args.directory, args.destination, args.rules, args.apply)
         if args.command == "rollback":
             return run_rollback(args.destination, args.operation_id)
-    except (FileNotFoundError, NotADirectoryError, PermissionError, ValueError) as error:
+    except (OSError, ValueError) as error:
         parser.error(str(error))
     return 0
 
