@@ -190,7 +190,7 @@ The default database is stored locally at `instance/filesense.db`. It is generat
 - Scan history stores metadata snapshots, not copies of the scanned files.
 - No file operation is performed automatically.
 
-Future organization features will use a preview-first workflow and require explicit confirmation before changing files.
+Organization always starts in preview mode. Applying a plan requires explicit confirmation, and rollback refuses to overwrite existing files.
 
 ## Development and tests
 
