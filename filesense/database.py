@@ -61,44 +61,47 @@ def save_scan(
     error_list = list(errors)
     summary = build_summary(record_list)
     scanned_at = datetime.now(timezone.utc).isoformat()
-
-    with connect_database(database_path) as connection:
-        cursor = connection.execute(
-            """
-            INSERT INTO scans
-                (root_path, scanned_at, total_files, total_bytes, summary_json, error_count)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                str(Path(root_path).expanduser().resolve()),
-                scanned_at,
-                summary["total_files"],
-                summary["total_bytes"],
-                json.dumps(summary, sort_keys=True),
-                len(error_list),
-            ),
-        )
-        scan_id = int(cursor.lastrowid)
-        connection.executemany(
-            """
-            INSERT INTO scan_files
-                (scan_id, name, path, extension, size_bytes, modified_at, category)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            [
+    connection = connect_database(database_path)
+    try:
+        with connection:
+            cursor = connection.execute(
+                """
+                INSERT INTO scans
+                    (root_path, scanned_at, total_files, total_bytes, summary_json, error_count)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
                 (
-                    scan_id,
-                    record.name,
-                    record.path,
-                    record.extension,
-                    record.size_bytes,
-                    record.modified_at,
-                    record.category,
-                )
-                for record in record_list
-            ],
-        )
-    return scan_id
+                    str(Path(root_path).expanduser().resolve()),
+                    scanned_at,
+                    summary["total_files"],
+                    summary["total_bytes"],
+                    json.dumps(summary, sort_keys=True),
+                    len(error_list),
+                ),
+            )
+            scan_id = int(cursor.lastrowid)
+            connection.executemany(
+                """
+                INSERT INTO scan_files
+                    (scan_id, name, path, extension, size_bytes, modified_at, category)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        scan_id,
+                        record.name,
+                        record.path,
+                        record.extension,
+                        record.size_bytes,
+                        record.modified_at,
+                        record.category,
+                    )
+                    for record in record_list
+                ],
+            )
+        return scan_id
+    finally:
+        connection.close()
 
 
 def list_scans(
@@ -112,7 +115,8 @@ def list_scans(
     if not path.exists():
         return []
 
-    with connect_database(path) as connection:
+    connection = connect_database(path)
+    try:
         rows = connection.execute(
             """
             SELECT id, root_path, scanned_at, total_files, total_bytes,
@@ -123,6 +127,8 @@ def list_scans(
             """,
             (limit,),
         ).fetchall()
+    finally:
+        connection.close()
 
     results = []
     for row in rows:
