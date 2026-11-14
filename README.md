@@ -12,6 +12,10 @@ FileSense is a command-line tool that scans directories, turns filesystem conten
 - Find the largest files
 - Detect identical file contents using SHA-256 hashing
 - Group duplicate files even when their names differ
+- Search by partial filename, extension, category, file size, and modification date
+- Combine multiple search filters and sort matching files
+- Save scan summaries and file metadata in a local SQLite database
+- Review previous scans through persistent scan history
 - Export scan results as JSON or CSV
 - Handle inaccessible files without stopping the entire scan
 
@@ -25,79 +29,86 @@ FileSense is a command-line tool that scans directories, turns filesystem conten
 
 Clone the repository and enter the project directory:
 
-```bash
-git clone https://github.com/sanath-kutsa/FileSense.git
-cd FileSense
-```
+    git clone https://github.com/sanath-kutsa/FileSense.git
+    cd FileSense
 
 Create a virtual environment:
 
-```bash
-python -m venv .venv
-```
+    python -m venv .venv
 
 Activate it in Windows PowerShell:
 
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
+    .\.venv\Scripts\Activate.ps1
 
 If PowerShell blocks activation scripts, you can temporarily allow activation for the current terminal session with:
 
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\.venv\Scripts\Activate.ps1
-```
+    Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+    .\.venv\Scripts\Activate.ps1
 
 Install development dependencies:
 
-```bash
-python -m pip install -r requirements-dev.txt
-```
+    python -m pip install -r requirements-dev.txt
 
 ## Usage
 
-Scan and summarize a directory:
+Scan and summarize a directory. Every scan is saved to the local SQLite history database at `instance/filesense.db` by default:
 
-```bash
-python main.py scan .
-```
+    python main.py scan .
 
 Scan another directory:
 
-```bash
-python main.py scan "C:/Users/YourName/Downloads"
-```
+    python main.py scan "C:/Users/YourName/Downloads"
 
 List the 10 largest files:
 
-```bash
-python main.py largest . --limit 10
-```
+    python main.py largest . --limit 10
 
 Find duplicate files:
 
-```bash
-python main.py duplicates .
-```
-
-Scan a specific directory for duplicates:
-
-```bash
-python main.py duplicates "C:/Users/YourName/Downloads"
-```
-
-Change the hashing read size (default is 1 MiB):
-
-```bash
-python main.py duplicates . --chunk-size 65536
-```
+    python main.py duplicates .
 
 Export scan results:
 
-```bash
-python main.py scan . --json reports/scan.json --csv reports/scan.csv
-```
+    python main.py scan . --json reports/scan.json --csv reports/scan.csv
+
+### Intelligent search
+
+Search by a partial filename:
+
+    python main.py search . --name report
+
+Filter by extension and category:
+
+    python main.py search . --extension pdf --category Documents
+
+Use a size range in bytes:
+
+    python main.py search . --min-size 1024 --max-size 10485760
+
+Filter by modification date. Dates and times use ISO format:
+
+    python main.py search . --modified-after 2026-01-01 --modified-before 2026-12-31
+
+Combine filters and sort largest first:
+
+    python main.py search . --name project --extension pdf --extension docx --sort-by size --descending
+
+Supported sort keys are `name`, `size`, and `modified`. Repeat `--extension` to match more than one extension. Search scans the selected directory and saves that scan to history.
+
+### Scan history
+
+Show the 10 most recent scans:
+
+    python main.py history
+
+Show more entries:
+
+    python main.py history --limit 25
+
+Choose a different SQLite database location:
+
+    python main.py scan . --database reports/custom-history.db
+    python main.py history --database reports/custom-history.db
 
 ## How duplicate detection works
 
@@ -108,11 +119,22 @@ python main.py scan . --json reports/scan.json --csv reports/scan.csv
 
 Chunked reading keeps memory use bounded even when files are large. SHA-256 is used as a practical content fingerprint; a matching digest is treated as a strong indication that file contents match.
 
+## How search works
+
+The search module receives the file records collected by the scanner and applies the requested filters in memory. Filters can be combined, and the final results can be sorted by filename, file size, or modification time. Search never changes the underlying files.
+
+## How scan history works
+
+FileSense uses Python's built-in `sqlite3` module, so no database server or additional runtime package is required. Each saved scan has a timestamp, scanned directory, file count, total storage, summary data, and warning count. The associated file metadata is stored as a per-scan snapshot, allowing historical records to remain available even after later scans.
+
+The default database is stored locally at `instance/filesense.db`. It is generated at runtime and is not intended to be committed to Git.
+
 ## Safety principles
 
-- Scanning and duplicate detection are read-only.
+- Scanning, searching, and duplicate detection are read-only.
 - FileSense never deletes, renames, or moves files during these operations.
 - Inaccessible files are reported as warnings and skipped.
+- Scan history stores metadata snapshots, not copies of the scanned files.
 - No file operation is performed automatically.
 
 Future organization features will use a preview-first workflow and require explicit confirmation before changing files.
@@ -121,33 +143,33 @@ Future organization features will use a preview-first workflow and require expli
 
 Run the test suite:
 
-```bash
-python -m pytest -v
-```
+    python -m pytest -v
 
 ## Project structure
 
-```text
-FileSense/
-├── filesense/
-│   ├── __init__.py
-│   ├── analyzer.py
-│   ├── categorizer.py
-│   ├── duplicates.py
-│   ├── models.py
-│   ├── reports.py
-│   └── scanner.py
-├── tests/
-│   ├── test_analyzer.py
-│   ├── test_categorizer.py
-│   ├── test_duplicates.py
-│   └── test_scanner.py
-├── reports/
-├── .gitignore
-├── main.py
-├── README.md
-└── requirements-dev.txt
-```
+    FileSense/
+    ├── filesense/
+    │   ├── __init__.py
+    │   ├── analyzer.py
+    │   ├── categorizer.py
+    │   ├── database.py
+    │   ├── duplicates.py
+    │   ├── models.py
+    │   ├── reports.py
+    │   ├── scanner.py
+    │   └── search.py
+    ├── tests/
+    │   ├── test_analyzer.py
+    │   ├── test_categorizer.py
+    │   ├── test_database.py
+    │   ├── test_duplicates.py
+    │   ├── test_scanner.py
+    │   └── test_search.py
+    ├── reports/
+    ├── .gitignore
+    ├── main.py
+    ├── README.md
+    └── requirements-dev.txt
 
 ## Roadmap
 
@@ -156,14 +178,15 @@ FileSense/
 - [x] Storage summaries and largest-file analysis
 - [x] JSON and CSV reports
 - [x] SHA-256 duplicate detection
-- [ ] Search and filtering
-- [ ] SQLite scan and operation history
+- [x] Search and filtering
+- [x] SQLite scan history
 - [ ] Preview-first file organization with reversible operation history
 - [ ] Expanded test coverage and performance profiling
+- [ ] Final release and documentation polish
 
 ## Learning goals
 
-FileSense is a practical Python engineering project covering filesystem APIs, modular design, data modeling, hashing, algorithmic complexity, error handling, command-line interfaces, serialization, and automated testing.
+FileSense is a practical Python engineering project covering filesystem APIs, modular design, data modeling, hashing, search and filtering, SQLite persistence, algorithmic complexity, error handling, command-line interfaces, serialization, and automated testing.
 
 ## License
 
