@@ -14,12 +14,14 @@ from .models import FileRecord
 LOGGER = logging.getLogger("filesense")
 HISTORY_FILENAME = ".filesense-history.json"
 
+
 @dataclass(frozen=True, slots=True)
 class MoveOperation:
     """A proposed move from an existing file to a destination path."""
 
     source: Path
     destination: Path
+
 
 @dataclass(frozen=True, slots=True)
 class AppliedOperation:
@@ -28,6 +30,7 @@ class AppliedOperation:
     operation_id: str
     moved_files: tuple[MoveOperation, ...]
 
+
 def _safe_folder_name(value: str) -> str:
     name = value.strip()
     if not name or name in {".", ".."} or Path(name).name != name:
@@ -35,6 +38,7 @@ def _safe_folder_name(value: str) -> str:
     if any(char in name for char in '<>:"/\\|?*'):
         raise ValueError(f"Organization folder contains invalid characters: {value!r}")
     return name
+
 
 def build_organization_plan(
     records: Iterable[FileRecord],
@@ -84,8 +88,10 @@ def build_organization_plan(
         plan.append(MoveOperation(source=source, destination=target))
     return plan
 
+
 def _history_path(destination: str | Path) -> Path:
     return Path(destination).expanduser().resolve() / HISTORY_FILENAME
+
 
 def _read_history(path: Path) -> list[dict]:
     if not path.exists():
@@ -94,9 +100,10 @@ def _read_history(path: Path) -> list[dict]:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
         raise ValueError(f"Cannot read FileSense operation history: {error}") from error
-    if not isinstance(data, list):
+    if not isinstance(data, list) or not all(isinstance(item, dict) for item in data):
         raise ValueError("FileSense operation history has an invalid format.")
     return data
+
 
 def _write_history(path: Path, entries: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -107,6 +114,7 @@ def _write_history(path: Path, entries: list[dict]) -> None:
     finally:
         if temporary.exists():
             temporary.unlink()
+
 
 def apply_organization_plan(
     plan: Iterable[MoveOperation],
@@ -142,6 +150,11 @@ def apply_organization_plan(
         if target.exists():
             raise FileExistsError(f"Destination already exists: {target}")
 
+    # Validate the existing journal before moving anything. A malformed journal
+    # must never leave files moved without a corresponding operation record.
+    history_path = _history_path(destination)
+    entries = _read_history(history_path)
+
     operation_id = uuid4().hex
     completed: list[MoveOperation] = []
     try:
@@ -165,8 +178,6 @@ def apply_organization_plan(
             for item in completed
         ],
     }
-    history_path = _history_path(destination)
-    entries = _read_history(history_path)
     entries.append(entry)
     try:
         _write_history(history_path, entries)
@@ -178,6 +189,7 @@ def apply_organization_plan(
         raise
     LOGGER.info("Organization operation %s completed (%d files)", operation_id, len(completed))
     return AppliedOperation(operation_id=operation_id, moved_files=tuple(completed))
+
 
 def rollback_organization(
     destination: str | Path,
@@ -193,10 +205,21 @@ def rollback_organization(
     if not candidates:
         raise ValueError(f"No active organization operation found for: {operation_id}")
     entry = candidates[-1]
-    operations = tuple(
-        MoveOperation(Path(item["source"]), Path(item["destination"]))
-        for item in entry["moves"]
-    )
+    try:
+        raw_moves = entry["moves"]
+        if not isinstance(raw_moves, list) or not all(
+            isinstance(item, dict) and "source" in item and "destination" in item
+            for item in raw_moves
+        ):
+            raise ValueError
+        operations = tuple(
+            MoveOperation(Path(item["source"]), Path(item["destination"]))
+            for item in raw_moves
+        )
+        recorded_operation_id = entry["operation_id"]
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError("FileSense operation history contains an invalid operation.") from error
+
     destination_root = Path(destination).expanduser().resolve()
     for operation in operations:
         try:
@@ -228,6 +251,16 @@ def rollback_organization(
 
     entry["rolled_back"] = True
     entry["rolled_back_at"] = datetime.now(timezone.utc).isoformat()
-    _write_history(history_path, entries)
-    LOGGER.info("Organization operation %s rolled back", entry["operation_id"])
-    return AppliedOperation(operation_id=entry["operation_id"], moved_files=operations)
+    try:
+        _write_history(history_path, entries)
+    except OSError:
+        # If the journal update fails, put the files back where the journal says
+        # they are so a later rollback attempt can safely retry.
+        for operation in reversed(restored):
+            operation.destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(operation.source), str(operation.destination))
+        entry.pop("rolled_back_at", None)
+        entry["rolled_back"] = False
+        raise
+    LOGGER.info("Organization operation %s rolled back", recorded_operation_id)
+    return AppliedOperation(operation_id=recorded_operation_id, moved_files=operations)
