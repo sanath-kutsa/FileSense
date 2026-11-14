@@ -29,6 +29,8 @@ def _parse_datetime(value: str | None, field_name: str) -> datetime | None:
         parsed = datetime.fromisoformat(value)
     except ValueError as error:
         raise ValueError(f"{field_name} must be a valid ISO date or datetime.") from error
+    if field_name == "modified_before" and len(value) == 10:
+        parsed = parsed.replace(hour=23, minute=59, second=59, microsecond=999999)
     if parsed.tzinfo is None:
         parsed = parsed.astimezone()
     return parsed.astimezone(timezone.utc)
