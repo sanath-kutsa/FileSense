@@ -1,6 +1,6 @@
 """Preview-first file organization with an operation journal and rollback."""
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
 import logging
@@ -121,9 +121,22 @@ def apply_organization_plan(
     if not operations:
         raise ValueError("There are no file moves to apply.")
 
+    destination_root = Path(destination).expanduser().resolve()
     for operation in operations:
-        source = operation.source.resolve()
-        target = operation.destination.resolve()
+        source = operation.source.expanduser().resolve()
+        target = operation.destination.expanduser().resolve()
+        try:
+            target.relative_to(destination_root)
+        except ValueError as error:
+            raise ValueError("A planned destination is outside the organization directory.") from error
+        try:
+            source.relative_to(destination_root)
+        except ValueError:
+            pass
+        else:
+            raise ValueError("A source file cannot already be inside the organization directory.")
+        if source == target:
+            raise ValueError("Source and destination paths must be different.")
         if not source.is_file():
             raise FileNotFoundError(f"Source file no longer exists: {source}")
         if target.exists():
@@ -184,6 +197,14 @@ def rollback_organization(
         MoveOperation(Path(item["source"]), Path(item["destination"]))
         for item in entry["moves"]
     )
+    destination_root = Path(destination).expanduser().resolve()
+    for operation in operations:
+        try:
+            operation.destination.resolve().relative_to(destination_root)
+        except ValueError as error:
+            raise ValueError("Operation journal contains a destination outside its organization directory.") from error
+        if not operation.source.is_absolute():
+            raise ValueError("Operation journal contains a non-absolute original path.")
     for operation in operations:
         if not operation.destination.is_file():
             raise FileNotFoundError(f"Moved file is missing: {operation.destination}")
