@@ -16,6 +16,10 @@ FileSense is a command-line tool that scans directories, turns filesystem conten
 - Combine multiple search filters and sort matching files
 - Save scan summaries and file metadata in a local SQLite database
 - Review previous scans through persistent scan history
+- Preview-first file organization by category or custom extension rules
+- Explicitly confirmed file moves with a JSON operation journal
+- Roll back recorded moves without overwriting existing files
+- Configurable paths and structured console/file logging
 - Export scan results as JSON or CSV
 - Handle inaccessible files without stopping the entire scan
 
@@ -95,6 +99,55 @@ Combine filters and sort largest first:
 
 Supported sort keys are `name`, `size`, and `modified`. Repeat `--extension` to match more than one extension. Search scans the selected directory and saves that scan to history.
 
+### Safe file organization
+
+Preview proposed moves without changing anything:
+
+    python main.py organize "C:/Users/YourName/Downloads"
+
+Choose a separate destination:
+
+    python main.py organize "C:/Users/YourName/Downloads" --destination "D:/OrganizedFiles"
+
+Custom rules are a JSON object mapping extensions to folder names, for example:
+
+    {".pdf": "PDF Files", ".jpg": "Photos", ".png": "Photos"}
+
+Save it as `rules.json`, then preview:
+
+    python main.py organize "C:/Users/YourName/Downloads" --rules rules.json
+
+After reviewing the preview, request an apply prompt:
+
+    python main.py organize "C:/Users/YourName/Downloads" --rules rules.json --apply
+
+FileSense asks for the exact word `yes` before moving anything. It refuses destination collisions instead of overwriting files. Each successful operation is recorded in `.filesense-history.json` inside the destination.
+
+Roll back the latest operation:
+
+    python main.py rollback "D:/OrganizedFiles"
+
+Or specify an operation ID:
+
+    python main.py rollback "D:/OrganizedFiles" --operation-id YOUR_OPERATION_ID
+
+Rollback refuses to overwrite an occupied original path. FileSense never deletes files as part of organization or rollback.
+
+### Configuration and logging
+
+Environment variables can override defaults:
+
+- `FILESENSE_DATABASE`: SQLite database path
+- `FILESENSE_LOG`: log file path
+- `FILESENSE_LOG_LEVEL`: DEBUG, INFO, WARNING, ERROR, or CRITICAL
+
+For example, in PowerShell:
+
+    $env:FILESENSE_LOG_LEVEL = "DEBUG"
+    $env:FILESENSE_LOG = "logs/debug.log"
+
+Logs are written to the console and configured file. The scanner's iterator processes filesystem paths incrementally, while metadata remains represented by typed, immutable records.
+
 ### Scan history
 
 Show the 10 most recent scans:
@@ -152,9 +205,12 @@ Run the test suite:
     │   ├── __init__.py
     │   ├── analyzer.py
     │   ├── categorizer.py
+    │   ├── config.py
     │   ├── database.py
     │   ├── duplicates.py
+    │   ├── logging_config.py
     │   ├── models.py
+    │   ├── organizer.py
     │   ├── reports.py
     │   ├── scanner.py
     │   └── search.py
@@ -180,7 +236,8 @@ Run the test suite:
 - [x] SHA-256 duplicate detection
 - [x] Search and filtering
 - [x] SQLite scan history
-- [ ] Preview-first file organization with reversible operation history
+- [x] Preview-first file organization with reversible operation history
+- [x] Configurable runtime settings and structured logging
 - [ ] Expanded test coverage and performance profiling
 - [ ] Final release and documentation polish
 
