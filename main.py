@@ -1,12 +1,16 @@
 """Command-line interface for FileSense."""
 
 import argparse
+import json
 from pathlib import Path
 
 from filesense.analyzer import build_summary, format_bytes, largest_files
+from filesense.config import CONFIG
 from filesense.database import DEFAULT_DB_PATH, list_scans, save_scan
 from filesense.duplicates import find_duplicates
+from filesense.logging_config import configure_logging
 from filesense.models import FileRecord
+from filesense.organizer import apply_organization_plan, build_organization_plan, rollback_organization
 from filesense.reports import export_csv, export_json
 from filesense.scanner import scan_directory
 from filesense.search import SearchCriteria, search_files
@@ -23,7 +27,7 @@ def create_parser() -> argparse.ArgumentParser:
     scan_parser.add_argument("directory", type=Path, help="Directory to scan.")
     scan_parser.add_argument("--json", dest="json_path", help="Write a JSON report to this path.")
     scan_parser.add_argument("--csv", dest="csv_path", help="Write a CSV report to this path.")
-    scan_parser.add_argument("--database", type=Path, default=DEFAULT_DB_PATH, help="SQLite history database path.")
+    scan_parser.add_argument("--database", type=Path, default=CONFIG.database_path, help="SQLite history database path.")
 
     largest_parser = subparsers.add_parser("largest", help="List the largest files in a directory.")
     largest_parser.add_argument("directory", type=Path, help="Directory to scan.")
@@ -57,6 +61,16 @@ def create_parser() -> argparse.ArgumentParser:
     history_parser = subparsers.add_parser("history", help="Show recent saved scan history.")
     history_parser.add_argument("--limit", type=int, default=10, help="Number of previous scans to display.")
     history_parser.add_argument("--database", type=Path, default=DEFAULT_DB_PATH, help="SQLite history database path.")
+
+    organize_parser = subparsers.add_parser("organize", help="Preview or explicitly apply safe file organization.")
+    organize_parser.add_argument("directory", type=Path, help="Directory whose files should be organized.")
+    organize_parser.add_argument("--destination", type=Path, help="Organization destination (default: <directory>/Organized).")
+    organize_parser.add_argument("--rules", type=Path, help="Optional JSON file mapping extensions to folder names.")
+    organize_parser.add_argument("--apply", action="store_true", help="Ask for confirmation and apply the previewed moves.")
+
+    rollback_parser = subparsers.add_parser("rollback", help="Reverse a previously recorded organization operation.")
+    rollback_parser.add_argument("destination", type=Path, help="Organization destination containing the operation journal.")
+    rollback_parser.add_argument("--operation-id", default="latest", help="Operation ID to reverse, or 'latest'.")
 
     return parser
 
@@ -201,9 +215,61 @@ def run_history(limit: int, database_path: Path) -> int:
     return 0
 
 
+def run_organize(directory: Path, destination: Path | None, rules_path: Path | None, apply: bool) -> int:
+    """Preview proposed moves and apply them only after explicit confirmation."""
+    target = destination or (directory / "Organized")
+    rules = {}
+    if rules_path:
+        try:
+            rules = json.loads(rules_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise ValueError(f"Could not load organization rules: {error}") from error
+        if not isinstance(rules, dict) or not all(
+            isinstance(key, str) and isinstance(value, str) for key, value in rules.items()
+        ):
+            raise ValueError("Rules JSON must be an object mapping extensions to folder names.")
+
+    records, errors = scan_directory(directory)
+    plan = build_organization_plan(records, target, rules)
+    print(f"\\nFileSense organization preview: {directory.expanduser().resolve()}")
+    print(f"Destination: {target.expanduser().resolve()}")
+    print(f"Proposed moves: {len(plan)}")
+    for operation in plan:
+        print(f"  {operation.source}\\n    -> {operation.destination}")
+    if errors:
+        print(f"\\nSkipped inaccessible files: {len(errors)}")
+    if not plan:
+        print("Nothing to organize.")
+        return 0
+    if not apply:
+        print("\\nPreview only. No files were moved or changed.")
+        print("Run again with --apply to request confirmation and execute these moves.")
+        return 0
+
+    print("\\nThis will move the files listed above. No files will be deleted.")
+    confirmation = input("Type 'yes' to apply this exact plan: ").strip().lower()
+    if confirmation != "yes":
+        print("Cancelled. No files were moved.")
+        return 0
+    result = apply_organization_plan(plan, target, confirmed=True)
+    print(f"\\nApplied operation: {result.operation_id}")
+    print(f"Files moved: {len(result.moved_files)}")
+    print(f"Operation history: {target.resolve() / '.filesense-history.json'}")
+    return 0
+
+
+def run_rollback(destination: Path, operation_id: str) -> int:
+    """Roll back a recorded organization operation."""
+    result = rollback_organization(destination, operation_id)
+    print(f"\\nRolled back operation: {result.operation_id}")
+    print(f"Files restored: {len(result.moved_files)}")
+    return 0
+
+
 def main() -> int:
     parser = create_parser()
     args = parser.parse_args()
+    configure_logging(CONFIG.log_path, CONFIG.log_level)
 
     try:
         if args.command == "scan":
@@ -218,6 +284,10 @@ def main() -> int:
             return run_search(args)
         if args.command == "history":
             return run_history(args.limit, args.database)
+        if args.command == "organize":
+            return run_organize(args.directory, args.destination, args.rules, args.apply)
+        if args.command == "rollback":
+            return run_rollback(args.destination, args.operation_id)
     except (FileNotFoundError, NotADirectoryError, PermissionError, ValueError) as error:
         parser.error(str(error))
     return 0
