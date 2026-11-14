@@ -31,3 +31,6 @@ reports/*
 instance/*.db
 instance/*.sqlite
 instance/*.sqlite3
+
+# Runtime logs
+logs/*.log
