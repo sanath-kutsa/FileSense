@@ -6,7 +6,7 @@ from pathlib import Path
 
 from filesense.analyzer import build_summary, format_bytes, largest_files
 from filesense.config import CONFIG
-from filesense.database import DEFAULT_DB_PATH, list_scans, save_scan
+from filesense.database import list_scans, save_scan
 from filesense.duplicates import find_duplicates
 from filesense.logging_config import configure_logging
 from filesense.models import FileRecord
@@ -56,7 +56,7 @@ def create_parser() -> argparse.ArgumentParser:
     search_parser.add_argument("--modified-before", help="Include files modified on or before this ISO date/time.")
     search_parser.add_argument("--sort-by", choices=("name", "size", "modified"), default="name")
     search_parser.add_argument("--descending", action="store_true", help="Reverse the selected sort order.")
-    search_parser.add_argument("--database", type=Path, default=DEFAULT_DB_PATH, help="SQLite history database path.")
+    search_parser.add_argument("--database", type=Path, default=CONFIG.database_path, help="SQLite history database path.")
 
     history_parser = subparsers.add_parser("history", help="Show recent saved scan history.")
     history_parser.add_argument("--limit", type=int, default=10, help="Number of previous scans to display.")
@@ -231,28 +231,28 @@ def run_organize(directory: Path, destination: Path | None, rules_path: Path | N
 
     records, errors = scan_directory(directory)
     plan = build_organization_plan(records, target, rules)
-    print(f"\\nFileSense organization preview: {directory.expanduser().resolve()}")
+    print(f"\nFileSense organization preview: {directory.expanduser().resolve()}")
     print(f"Destination: {target.expanduser().resolve()}")
     print(f"Proposed moves: {len(plan)}")
     for operation in plan:
-        print(f"  {operation.source}\\n    -> {operation.destination}")
+        print(f"  {operation.source}\n    -> {operation.destination}")
     if errors:
-        print(f"\\nSkipped inaccessible files: {len(errors)}")
+        print(f"\nSkipped inaccessible files: {len(errors)}")
     if not plan:
         print("Nothing to organize.")
         return 0
     if not apply:
-        print("\\nPreview only. No files were moved or changed.")
+        print("\nPreview only. No files were moved or changed.")
         print("Run again with --apply to request confirmation and execute these moves.")
         return 0
 
-    print("\\nThis will move the files listed above. No files will be deleted.")
+    print("\nThis will move the files listed above. No files will be deleted.")
     confirmation = input("Type 'yes' to apply this exact plan: ").strip().lower()
     if confirmation != "yes":
         print("Cancelled. No files were moved.")
         return 0
     result = apply_organization_plan(plan, target, confirmed=True)
-    print(f"\\nApplied operation: {result.operation_id}")
+    print(f"\nApplied operation: {result.operation_id}")
     print(f"Files moved: {len(result.moved_files)}")
     print(f"Operation history: {target.resolve() / '.filesense-history.json'}")
     return 0
@@ -261,7 +261,7 @@ def run_organize(directory: Path, destination: Path | None, rules_path: Path | N
 def run_rollback(destination: Path, operation_id: str) -> int:
     """Roll back a recorded organization operation."""
     result = rollback_organization(destination, operation_id)
-    print(f"\\nRolled back operation: {result.operation_id}")
+    print(f"\nRolled back operation: {result.operation_id}")
     print(f"Files restored: {len(result.moved_files)}")
     return 0
 
