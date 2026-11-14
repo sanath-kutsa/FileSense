@@ -53,6 +53,7 @@ The project is designed around one rule: **your files should never be changed wi
 
 ## Documentation
 
+- [Demo Guide](DEMO.md): sample workspace setup, repeatable CLI walkthrough, screenshot checklist, and presentation narration.
 - [Architecture Guide](ARCHITECTURE.md): module responsibilities, data flow, database design, organization workflow, safety boundaries, and design decisions.
 
 ## Requirements
