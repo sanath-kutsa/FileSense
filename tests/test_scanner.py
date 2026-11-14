@@ -41,3 +41,21 @@ def test_scan_file_path_raises_not_a_directory(tmp_path: Path):
 
     with pytest.raises(NotADirectoryError):
         scan_directory(file_path)
+
+
+def test_scan_reports_inaccessible_directory_errors(tmp_path: Path, monkeypatch):
+    import os
+
+    locked = tmp_path / "locked"
+
+    def fake_walk(root, onerror, followlinks):
+        onerror(PermissionError(13, "Permission denied", str(locked)))
+        yield str(root), [], []
+
+    monkeypatch.setattr(os, "walk", fake_walk)
+
+    records, errors = scan_directory(tmp_path)
+
+    assert records == []
+    assert len(errors) == 1
+    assert str(locked) in errors[0]
