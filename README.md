@@ -51,6 +51,10 @@ The project is designed around one rule: **your files should never be changed wi
 - Typed data models and modular Python packages.
 - Automated tests, linting, and formatting checks.
 
+## Documentation
+
+- [Architecture Guide](ARCHITECTURE.md): module responsibilities, data flow, database design, organization workflow, safety boundaries, and design decisions.
+
 ## Requirements
 
 - Python 3.10 or newer
