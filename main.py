@@ -60,7 +60,7 @@ def create_parser() -> argparse.ArgumentParser:
 
     history_parser = subparsers.add_parser("history", help="Show recent saved scan history.")
     history_parser.add_argument("--limit", type=int, default=10, help="Number of previous scans to display.")
-    history_parser.add_argument("--database", type=Path, default=DEFAULT_DB_PATH, help="SQLite history database path.")
+    history_parser.add_argument("--database", type=Path, default=CONFIG.database_path, help="SQLite history database path.")
 
     organize_parser = subparsers.add_parser("organize", help="Preview or explicitly apply safe file organization.")
     organize_parser.add_argument("directory", type=Path, help="Directory whose files should be organized.")
