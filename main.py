@@ -152,8 +152,6 @@ def run_duplicates(directory: Path, chunk_size: int) -> int:
 
 
 def run_search(args: argparse.Namespace) -> int:
-    records, errors = scan_directory(args.directory)
-    scan_id = persist_scan(args.directory, records, errors, args.database)
     criteria = SearchCriteria(
         name=args.name,
         extensions=tuple(args.extensions or ()),
@@ -165,6 +163,10 @@ def run_search(args: argparse.Namespace) -> int:
         sort_by=args.sort_by,
         descending=args.descending,
     )
+    # Validate filters before creating a scan-history entry.
+    search_files([], criteria)
+    records, errors = scan_directory(args.directory)
+    scan_id = persist_scan(args.directory, records, errors, args.database)
     matches = search_files(records, criteria)
 
     print(f"\nFileSense search: {args.directory.expanduser().resolve()}")
