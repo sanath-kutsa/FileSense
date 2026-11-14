@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 from filesense.analyzer import build_summary, format_bytes, largest_files
+from filesense.duplicates import find_duplicates
 from filesense.reports import export_csv, export_json
 from filesense.scanner import scan_directory
 
@@ -23,6 +24,18 @@ def create_parser() -> argparse.ArgumentParser:
     largest_parser = subparsers.add_parser("largest", help="List the largest files in a directory.")
     largest_parser.add_argument("directory", type=Path, help="Directory to scan.")
     largest_parser.add_argument("--limit", type=int, default=10, help="Number of files to show.")
+
+    duplicate_parser = subparsers.add_parser(
+        "duplicates",
+        help="Find files with identical contents using SHA-256.",
+    )
+    duplicate_parser.add_argument("directory", type=Path, help="Directory to scan for duplicates.")
+    duplicate_parser.add_argument(
+        "--chunk-size",
+        type=int,
+        default=1024 * 1024,
+        help="Bytes read per hashing operation (default: 1048576).",
+    )
 
     return parser
 
@@ -67,6 +80,40 @@ def run_largest(directory: Path, limit: int) -> int:
     return 0
 
 
+def run_duplicates(directory: Path, chunk_size: int) -> int:
+    records, scan_errors = scan_directory(directory)
+    groups, hash_errors = find_duplicates(records, chunk_size=chunk_size)
+    errors = scan_errors + hash_errors
+
+    print(f"\nFileSense duplicate scan: {directory.expanduser().resolve()}")
+    if not groups:
+        print("No duplicate files found.")
+    else:
+        print(f"Duplicate groups found: {len(groups)}")
+        total_redundant_bytes = 0
+        for index, group in enumerate(groups, start=1):
+            duplicate_copies = len(group.files) - 1
+            total_redundant_bytes += group.size_bytes * duplicate_copies
+            print(f"\nGroup {index} | {format_bytes(group.size_bytes)} each")
+            print(f"SHA-256: {group.sha256}")
+            for record in group.files:
+                print(f"  - {record.path}")
+        print(
+            "\nPotential duplicate storage: "
+            f"{format_bytes(total_redundant_bytes)} "
+            "(excluding the first copy in each group)"
+        )
+
+    if errors:
+        print(f"\nWarnings: {len(errors)} file(s) could not be accessed or hashed.")
+        for error in errors[:5]:
+            print(f"  - {error}")
+        if len(errors) > 5:
+            print(f"  ... and {len(errors) - 5} more.")
+    print("\nNo files were changed or deleted.")
+    return 0
+
+
 def main() -> int:
     parser = create_parser()
     args = parser.parse_args()
@@ -76,6 +123,10 @@ def main() -> int:
             return run_scan(args.directory, args.json_path, args.csv_path)
         if args.command == "largest":
             return run_largest(args.directory, args.limit)
+        if args.command == "duplicates":
+            if args.chunk_size < 1:
+                parser.error("--chunk-size must be at least 1")
+            return run_duplicates(args.directory, args.chunk_size)
     except (FileNotFoundError, NotADirectoryError, PermissionError, ValueError) as error:
         parser.error(str(error))
     return 0
