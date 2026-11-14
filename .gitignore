@@ -26,3 +26,8 @@ htmlcov/
 # Generated reports
 reports/*
 !reports/.gitkeep
+
+# Local SQLite databases
+instance/*.db
+instance/*.sqlite
+instance/*.sqlite3
